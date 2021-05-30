@@ -8,6 +8,7 @@ urlpatterns=[
 
     #图片验证码路由
     path('imagecode/',ImageCodeView.as_view(),name='imagecode'),
+
     
     #短信发送
     path('smscode/',SmsCodeView.as_view(),name='smscode'),
