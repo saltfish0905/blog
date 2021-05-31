@@ -14,6 +14,7 @@ Including another URLconf
     2. Add a URL to urlpatterns:  path('blog/', include('blog.urls'))
 """
 #1.导入系统的logging
+from argparse import Namespace
 import logging
 from django.urls import path
 from django.contrib import admin
@@ -32,4 +33,5 @@ def log(request):
 urlpatterns = [
     path('admin/', admin.site.urls),
     path('',include(('users.urls','users'),namespace='users')),
+    path('',include(('home.urls','home'),namespace='home')),
 ]

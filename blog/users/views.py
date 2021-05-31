@@ -1,12 +1,13 @@
 from django.shortcuts import render
-
+from django.shortcuts import redirect
+from django.urls import reverse
 # Create your views here.
 #注册视图
 from django.views import View
 from django.http.response import HttpResponseBadRequest
 from libs.captcha.captcha import captcha
 from django_redis import get_redis_connection
-from django.http import HttpResponse, JsonResponse
+from django.http import HttpResponse, JsonResponse, response
 import re
 from users.models import User
 from django.db import DatabaseError
@@ -38,8 +39,8 @@ class RegisterView(View):
         if not all([mobile,password,password2,smscode]):
             return HttpResponseBadRequest('缺少必要的参数')
         #2.2
-        #if not re.match(r'^1[3-9]\d{9}$',mobile):
-        #   return HttpResponseBadRequest('手机号不符合规则')
+        if not re.match(r'^1[3-9]\d{9}$',mobile):
+           return HttpResponseBadRequest('手机号不符合规则')
         #2.3
         if not re.match(r'^[0-9A-Za-z]{8,20}$',password):
             return HttpResponseBadRequest('请输入8-20位密码，密码是数字和字母')
@@ -59,8 +60,15 @@ class RegisterView(View):
         except DatabaseError as e:
             logger.error(e)
             return HttpResponseBadRequest('注册失败')
+        from django.contrib.auth import login
+        login(request,user)
         #4 暂时先返回注册成功信息，后面再补充跳转到指定页面
-        return HttpResponse('注册成功,重定向到首页')
+        # redirect 重定向 reverse通过namespace:name来获取到视图所对应的路由
+        response=redirect(reverse('home:index'))
+        #设置cookie信息，以方便首页中用户信息展示的判断和用户信息的展示
+        response.set_cookie('is_login',True)
+        response.set_cookie('username',user.username,max_age=7*24*3600)
+        return response
 
 class ImageCodeView(View):
 
@@ -153,4 +161,52 @@ class SmsCodeView(View):
         #6
         return JsonResponse({'code':RETCODE.OK,'errmsg':'短信发送成功'})
 
+class LoginView(View):
+    def get(self,request):
+        
+        return render(request,'login.html')
+    def post(self,request):
+        '''
+        1.接收参数
+        2.参数验证
+            2.1验证手机号是否符合规则
+            2.2验证密码是否符合规则
+        3.用户认证登录
+        4.状态保持
+        5.根据用户选择的是否记住登录状态进行判断
+        6.为了首页显示设置cookie信息
+        7.返回响应
+        '''
+        #1
+        mobile=request.POST.get('mobile')
+        password=request.POST.get('password')
+        remember=request.POST.get('remember')
+        #2
+        if not re.match(r'^1[3-9]\d{9}$',mobile):
+            return HttpResponseBadRequest('手机号不符合规则')
+        if not re.match(r'^[0-9A-Za-z]{8,20}$',password):
+            return HttpResponseBadRequest('密码不符合规则')
+        #3 采用系统自带的认证方法
+        # 若用户名和密码正确，会返回user,不正确会返回None
+        from django.contrib.auth import authenticate
+        #默认认证方法针对username字段进行用户名判断
+        #当前判断信息为手机号，需要修改一下认证字段,需要到user模型中进行修改
+        user=authenticate(mobile=mobile,password=password)
+        if user is None:
+            return HttpResponseBadRequest('用户名或密码错误')
+        #4
+        from django.contrib.auth import login
+        login(request,user)
+        #5/6
+        response=redirect(reverse('home:index'))
+        if remember !='on':
+            request.session.set_expiry(0)
+            response.set_cookie('is_login',True)
+            response.set_cookie('username',user.username,max_age=14*24*3600)
+        else:
+            request.session.set_expiry(None) #默认为两周
+            response.set_cookie('is_login',True,max_age=14*24*3600)
+            response.set_cookie('username',user.username,max_age=14*24*3600)
+        return response
+        
 
