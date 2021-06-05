@@ -60,6 +60,7 @@ class RegisterView(View):
         except DatabaseError as e:
             logger.error(e)
             return HttpResponseBadRequest('注册失败')
+        
         from django.contrib.auth import login
         login(request,user)
         #4 暂时先返回注册成功信息，后面再补充跳转到指定页面
@@ -208,5 +209,15 @@ class LoginView(View):
             response.set_cookie('is_login',True,max_age=14*24*3600)
             response.set_cookie('username',user.username,max_age=14*24*3600)
         return response
-        
 
+from django.contrib.auth import logout       
+class LogoutView(View):
+    
+    def get(self,request):
+        #1.session数据清除
+        logout(request)
+        #2.删除部分cookie数据
+        response=redirect(reverse('home:index'))
+        response.delete_cookie('is_login')
+        #3.跳转到首页
+        return response
